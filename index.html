@@ -561,8 +561,12 @@
                 <h3 style="text-align: center; margin-bottom: 20px; color: #2E8B57;">📝 Entrada Manual de Amostra</h3>
                 
                 <div class="form-group">
-                    <label for="manual-codigo">Código da Amostra</label>
-                    <input type="text" id="manual-codigo" placeholder="Ex: 31033">
+                    <label for="manual-codigo">Códigos das Amostras</label>
+                    <input type="text" id="manual-codigo" placeholder="Ex: 10;20;30 ou apenas 10">
+                    <small style="color: #6c757d; font-size: 12px;">
+                        💡 <strong>Múltiplas amostras:</strong> Separe por ponto e vírgula (;)<br>
+                        📋 <strong>Exemplo:</strong> 10;20;30 (criará 3 amostras sequenciais)
+                    </small>
                 </div>
                 
                 <div class="form-group">
@@ -587,12 +591,22 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="manual-posicao">Posição no Lado</label>
-                    <input type="number" id="manual-posicao" min="1" placeholder="1, 2, 3...">
+                    <label for="manual-posicao">Posição Inicial</label>
+                    <input type="number" id="manual-posicao" min="1" placeholder="Ex: 1">
+                    <small style="color: #6c757d; font-size: 12px;">
+                        📍 <strong>Posição inicial:</strong> Amostras múltiplas serão colocadas em sequência<br>
+                        📋 <strong>Exemplo:</strong> Posição 1 → amostras nas posições 1, 2, 3...
+                    </small>
+                </div>
+                
+                <div id="preview-area" style="display: none; margin: 15px 0; padding: 10px; background: #e8f5e8; border-radius: 5px; border-left: 4px solid #2E8B57;">
+                    <strong>📋 Preview das amostras:</strong>
+                    <div id="preview-content"></div>
                 </div>
                 
                 <div class="buttons">
                     <button class="btn btn-primary" onclick="adicionarAmostraManual()">➕ Adicionar</button>
+                    <button class="btn btn-secondary" onclick="previewAmostras()">👁️ Preview</button>
                     <button class="btn btn-secondary" onclick="voltarParaSetup()">⬅️ Voltar</button>
                 </div>
             </div>
@@ -875,18 +889,19 @@
             document.getElementById('manual-lado').value = ladoAtual;
             document.getElementById('manual-codigo').value = '';
             document.getElementById('manual-tipo-remessa').value = '';
+            document.getElementById('preview-area').style.display = 'none';
             
             mostrarPainel('manual-entry-panel');
         }
 
         function adicionarAmostraManual() {
-            const codigo = document.getElementById('manual-codigo').value.trim();
+            const codigosInput = document.getElementById('manual-codigo').value.trim();
             const tipoRemessa = document.getElementById('manual-tipo-remessa').value;
             const lado = document.getElementById('manual-lado').value;
-            const posicao = parseInt(document.getElementById('manual-posicao').value);
+            const posicaoInicial = parseInt(document.getElementById('manual-posicao').value);
 
-            if (!codigo) {
-                alert('Por favor, insira o código da amostra!');
+            if (!codigosInput) {
+                alert('Por favor, insira o(s) código(s) da(s) amostra(s)!');
                 return;
             }
 
@@ -895,46 +910,154 @@
                 return;
             }
 
-            if (!posicao || posicao < 1) {
-                alert('Por favor, insira uma posição válida!');
+            if (!posicaoInicial || posicaoInicial < 1) {
+                alert('Por favor, insira uma posição inicial válida!');
                 return;
             }
 
-            // Verificar se já existe amostra com mesmo código
-            if (amostras.some(a => a.codigo === codigo)) {
-                alert(`Amostra ${codigo} já foi adicionada!`);
+            // Processar códigos (separados por ; ou único)
+            const codigos = codigosInput.split(';').map(c => c.trim()).filter(c => c.length > 0);
+            
+            if (codigos.length === 0) {
+                alert('Nenhum código válido encontrado!');
                 return;
             }
 
-            // Verificar se posição já está ocupada
-            if (amostras.some(a => a.lado === lado && a.posicao === posicao)) {
-                if (!confirm(`Posição ${posicao} do lado ${lado} já está ocupada. Deseja substituir?`)) {
+            // Verificar códigos duplicados no input
+            const codigosUnicos = [...new Set(codigos)];
+            if (codigosUnicos.length !== codigos.length) {
+                alert('❌ Códigos duplicados no input!\n\nRemova as duplicatas e tente novamente.');
+                return;
+            }
+
+            // Verificar se algum código já existe no sistema COM O MESMO TIPO DE TESTE
+            const codigosExistentes = codigos.filter(codigo => 
+                amostras.some(a => a.codigo === codigo && a.tipoTeste === configuracao.tipoTeste)
+            );
+            
+            if (codigosExistentes.length > 0) {
+                alert(`❌ Códigos já existem no sistema para o teste ${configuracao.tipoTeste}:\n${codigosExistentes.join(', ')}\n\n💡 Observação: O mesmo código pode existir para testes diferentes (GA, EA48, EA72)`);
+                return;
+            }
+
+            // Verificar conflitos de posição
+            const conflitos = [];
+            for (let i = 0; i < codigos.length; i++) {
+                const posicao = posicaoInicial + i;
+                const conflito = amostras.find(a => a.lado === lado && a.posicao === posicao);
+                if (conflito) {
+                    conflitos.push(`Posição ${posicao}: ${conflito.codigo} (${conflito.tipoTeste || configuracao.tipoTeste})`);
+                }
+            }
+
+            if (conflitos.length > 0) {
+                const confirmar = confirm(`⚠️ CONFLITOS DE POSIÇÃO:\n\n${conflitos.join('\n')}\n\nDeseja substituir essas amostras?`);
+                if (!confirmar) {
                     return;
                 }
-                // Remover amostra existente na posição
-                amostras = amostras.filter(a => !(a.lado === lado && a.posicao === posicao));
+                
+                // Remover amostras conflitantes
+                for (let i = 0; i < codigos.length; i++) {
+                    const posicao = posicaoInicial + i;
+                    amostras = amostras.filter(a => !(a.lado === lado && a.posicao === posicao));
+                }
             }
 
-            const amostra = {
-                codigo: codigo,
-                url: `http://softsulsistemas.com.br/?codigoamostra=${codigo}`,
-                lado: lado,
-                posicao: posicao,
-                tipoRemessa: tipoRemessa,
-                timestamp: new Date().toISOString(),
-                manual: true
-            };
+            // Adicionar todas as amostras
+            const amostrasAdicionadas = [];
+            for (let i = 0; i < codigos.length; i++) {
+                const codigo = codigos[i];
+                const posicao = posicaoInicial + i;
+                
+                const amostra = {
+                    codigo: codigo,
+                    url: `http://softsulsistemas.com.br/?codigoamostra=${codigo}`,
+                    lado: lado,
+                    posicao: posicao,
+                    tipoRemessa: tipoRemessa,
+                    tipoTeste: configuracao.tipoTeste, // Adicionar tipo de teste à amostra
+                    timestamp: new Date().toISOString(),
+                    manual: true
+                };
+                
+                amostras.push(amostra);
+                amostrasAdicionadas.push(`${codigo} (${configuracao.tipoTeste}) → Pos. ${posicao}`);
+            }
 
-            amostras.push(amostra);
             salvarDados();
             
-            alert(`✅ Amostra adicionada com sucesso!\n\nCódigo: ${codigo}\nOrigem: ${tipoRemessa}\nPosição: ${posicao} (${lado})`);
+            // Mostrar resumo
+            const resumo = `✅ ${codigos.length} amostra(s) adicionada(s)!\n\nTeste: ${configuracao.tipoTeste}\nOrigem: ${tipoRemessa}\nLado: ${lado}\n\nDetalhes:\n${amostrasAdicionadas.join('\n')}`;
+            alert(resumo);
             
             // Limpar formulário e sugerir próxima posição
             document.getElementById('manual-codigo').value = '';
             document.getElementById('manual-tipo-remessa').value = '';
-            const proximaPosicao = amostras.filter(a => a.lado === lado).length + 1;
+            document.getElementById('preview-area').style.display = 'none';
+            
+            const proximaPosicao = Math.max(...amostras.filter(a => a.lado === lado).map(a => a.posicao)) + 1;
             document.getElementById('manual-posicao').value = proximaPosicao;
+        }
+
+        function previewAmostras() {
+            const codigosInput = document.getElementById('manual-codigo').value.trim();
+            const tipoRemessa = document.getElementById('manual-tipo-remessa').value;
+            const lado = document.getElementById('manual-lado').value;
+            const posicaoInicial = parseInt(document.getElementById('manual-posicao').value);
+
+            if (!codigosInput) {
+                alert('Digite os códigos das amostras para ver o preview!');
+                return;
+            }
+
+            if (!posicaoInicial || posicaoInicial < 1) {
+                alert('Digite uma posição inicial válida!');
+                return;
+            }
+
+            // Processar códigos
+            const codigos = codigosInput.split(';').map(c => c.trim()).filter(c => c.length > 0);
+            
+            if (codigos.length === 0) {
+                alert('Nenhum código válido encontrado!');
+                return;
+            }
+
+            // Gerar preview
+            let previewHtml = `<strong>📊 Será(ão) criada(s) ${codigos.length} amostra(s) para ${configuracao.tipoTeste}:</strong><br><br>`;
+            
+            for (let i = 0; i < codigos.length; i++) {
+                const codigo = codigos[i];
+                const posicao = posicaoInicial + i;
+                const existeNoTeste = amostras.some(a => a.codigo === codigo && a.tipoTeste === configuracao.tipoTeste);
+                const existeOutroTeste = amostras.some(a => a.codigo === codigo && a.tipoTeste !== configuracao.tipoTeste);
+                const conflito = amostras.find(a => a.lado === lado && a.posicao === posicao);
+                
+                let status = '✅';
+                let observacao = '';
+                
+                if (existeNoTeste) {
+                    status = '❌';
+                    observacao = ` (JÁ EXISTE PARA ${configuracao.tipoTeste})`;
+                } else if (existeOutroTeste) {
+                    const outroTeste = amostras.find(a => a.codigo === codigo && a.tipoTeste !== configuracao.tipoTeste);
+                    observacao = ` (já existe para ${outroTeste.tipoTeste})`;
+                }
+                
+                if (conflito) {
+                    if (status === '✅') status = '⚠️';
+                    observacao += ` | substituirá ${conflito.codigo} (${conflito.tipoTeste || configuracao.tipoTeste})`;
+                }
+                
+                previewHtml += `${status} <strong>${codigo}</strong> (${configuracao.tipoTeste}) → Posição ${posicao} (${lado})${observacao}<br>`;
+            }
+            
+            if (tipoRemessa) {
+                previewHtml += `<br><strong>Origem:</strong> ${tipoRemessa}`;
+            }
+
+            document.getElementById('preview-content').innerHTML = previewHtml;
+            document.getElementById('preview-area').style.display = 'block';
         }
 
         // ===== GERENCIAMENTO DO MAPA =====
@@ -1191,9 +1314,9 @@ Origem: ${amostra.tipoRemessa || 'Não definido'}
             if (codigo && codigo.trim()) {
                 const codigoLimpo = codigo.trim();
                 
-                // Verificar se código já existe
-                if (amostras.some(a => a.codigo === codigoLimpo)) {
-                    alert(`Amostra ${codigoLimpo} já foi adicionada!`);
+                // Verificar se código já existe PARA O MESMO TIPO DE TESTE
+                if (amostras.some(a => a.codigo === codigoLimpo && a.tipoTeste === configuracao.tipoTeste)) {
+                    alert(`Amostra ${codigoLimpo} já foi adicionada para o teste ${configuracao.tipoTeste}!`);
                     return;
                 }
                 
@@ -1220,6 +1343,7 @@ Origem: ${amostra.tipoRemessa || 'Não definido'}
                     lado: lado,
                     posicao: posicao,
                     tipoRemessa: tipoRemessaTexto,
+                    tipoTeste: configuracao.tipoTeste, // Adicionar tipo de teste
                     timestamp: new Date().toISOString(),
                     manual: true
                 };
@@ -1227,7 +1351,7 @@ Origem: ${amostra.tipoRemessa || 'Não definido'}
                 amostras.push(amostra);
                 salvarDados();
                 gerarMapa();
-                alert(`✅ Amostra adicionada!\n\nCódigo: ${codigoLimpo}\nOrigem: ${tipoRemessaTexto}\nPosição: ${posicao} (${lado})`);
+                alert(`✅ Amostra adicionada!\n\nCódigo: ${codigoLimpo}\nTeste: ${configuracao.tipoTeste}\nOrigem: ${tipoRemessaTexto}\nPosição: ${posicao} (${lado})`);
             }
         }
 
