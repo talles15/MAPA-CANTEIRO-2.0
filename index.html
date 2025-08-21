@@ -1,4 +1,134 @@
-<!DOCTYPE html>
+function gerarMapa() {
+            mostrarPainel('map-panel');
+            
+            document.getElementById('canteiro-title').textContent = 'Mapa do Canteiro ' + configuracao.canteiro;
+            
+            // Calcular estatísticas do canteiro
+            const tiposUnicos = [...new Set(amostras.map(a => a.tipoTeste).filter(t => t))];
+            let tipoTesteDisplay;
+            
+            if (tiposUnicos.length === 0) {
+                tipoTesteDisplay = configuracao.tipoTeste;
+            } else if (tiposUnicos.length === 1) {
+                tipoTesteDisplay = tiposUnicos[0];
+            } else {
+                tipoTesteDisplay = tiposUnicos.join(', ') + ' (Múltiplos)';
+            }
+            
+            const dataFormatada = new Date(configuracao.data).toLocaleDateString('pt-BR');
+            document.getElementById('canteiro-details').innerHTML = 
+                '📅 Data: ' + dataFormatada + ' | ' +
+                '🧪 Teste: ' + tipoTesteDisplay + ' | ' +
+                '📊 Total de Amostras: ' + amostras.length;
+
+            const amostrasEsquerda = amostras.filter(a => a.lado === 'esquerdo').sort((a, b) => a.posicao - b.posicao);
+            const amostrasDireita = amostras.filter(a => a.lado === 'direito').sort((a, b) => a.posicao - b.posicao);
+            
+            const maxPosicoes = Math.max(amostrasEsquerda.length, amostrasDireita.length, 45);
+
+            const tbody = document.getElementById('mapa-tbody');
+            tbody.innerHTML = '';
+
+            for (let i = 0; i < maxPosicoes; i++) {
+                const row = document.createElement('tr');
+                
+                // Posição
+                const posicaoCell = document.createElement('td');
+                posicaoCell.textContent = i + 1;
+                posicaoCell.style.fontWeight = 'bold';
+                row.appendChild(posicaoCell);
+
+                // Lado Esquerdo
+                const esquerdaCell = document.createElement('td');
+                esquerdaCell.className = 'sample-cell';
+                const amostraEsquerda = amostrasEsquerda.find(a => a.posicao === i + 1);
+                
+                if (amostraEsquerda) {
+                    const codigo = document.createElement('strong');
+                    codigo.textContent = amostraEsquerda.codigo;
+                    
+                    const info = document.createElement('div');
+                    info.className = 'sample-info';
+                    
+                    const tipoTeste = amostraEsquerda.tipoTeste || 'N/A';
+                    const origem = amostraEsquerda.tipoRemessa ? ' | ' + amostraEsquerda.tipoRemessa : '';
+                    const data = ' | ' + new Date(amostraEsquerda.timestamp).toLocaleDateString('pt-BR');
+                    const manual = amostraEsquerda.manual ? ' (Manual)' : '';
+                    
+                    info.textContent = tipoTeste + origem + data + manual;
+                    
+                    esquerdaCell.appendChild(codigo);
+                    esquerdaCell.appendChild(info);
+                    esquerdaCell.style.cursor = 'pointer';
+                    
+                    esquerdaCell.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        editarOuRemoverAmostra(amostraEsquerda);
+                    });
+                } else {
+                    const vazio = document.createElement('em');
+                    vazio.style.color = '#ccc';
+                    vazio.textContent = 'Vazio';
+                    esquerdaCell.appendChild(vazio);
+                    esquerdaCell.className += ' empty';
+                    esquerdaCell.style.cursor = 'pointer';
+                    
+                    esquerdaCell.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        adicionarAmostraNaPosicao('esquerdo', i + 1);
+                    });
+                }
+                row.appendChild(esquerdaCell);
+
+                // Lado Direito
+                const direitaCell = document.createElement('td');
+                direitaCell.className = 'sample-cell';
+                const amostraDireita = amostrasDireita.find(a => a.posicao === i + 1);
+                
+                if (amostraDireita) {
+                    const codigo = document.createElement('strong');
+                    codigo.textContent = amostraDireita.codigo;
+                    
+                    const info = document.createElement('div');
+                    info.className = 'sample-info';
+                    
+                    const tipoTeste = amostraDireita.tipoTeste || 'N/A';
+                    const origem = amostraDireita.tipoRemessa ? ' | ' + amostraDireita.tipoRemessa : '';
+                    const data = ' | ' + new Date(amostraDireita.timestamp).toLocaleDateString('pt-BR');
+                    const manual = amostraDireita.manual ? ' (Manual)' : '';
+                    
+                    info.textContent = tipoTeste + origem + data + manual;
+                    
+                    direitaCell.appendChild(codigo);
+                    direitaCell.appendChild(info);
+                    direitaCell.style.cursor = 'pointer';
+                    
+                    direitaCell.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        editarOuRemoverAmostra(amostraDireita);
+                    });
+                } else {
+                    const vazio = document.createElement('em');
+                    vazio.style.color = '#ccc';
+                    vazio.textContent = 'Vazio';
+                    direitaCell.appendChild(vazio);
+                    direitaCell.className += ' empty';
+                    direitaCell.style.cursor = 'pointer';
+                    
+                    direitaCell.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        adicionarAmostraNaPosicao('direito', i + 1);
+                    });
+                }
+                row.appendChild(direitaCell);
+
+                tbody.appendChild(row);
+            }
+        }<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -570,6 +700,19 @@
                 </div>
                 
                 <div class="form-group">
+                    <label for="manual-tipo-teste-individual">Tipo de Teste</label>
+                    <select id="manual-tipo-teste-individual">
+                        <option value="">Selecione...</option>
+                        <option value="GA">GA - Germinação</option>
+                        <option value="EA48">EA48 - Envelhecimento 48h</option>
+                        <option value="EA72">EA72 - Envelhecimento 72h</option>
+                    </select>
+                    <small style="color: #6c757d; font-size: 12px;">
+                        💡 <strong>Flexibilidade:</strong> Cada amostra pode ter um tipo de teste diferente
+                    </small>
+                </div>
+                
+                <div class="form-group">
                     <label for="manual-tipo-remessa">Origem da Amostra</label>
                     <select id="manual-tipo-remessa">
                         <option value="">Selecione...</option>
@@ -888,6 +1031,7 @@
             document.getElementById('manual-posicao').value = proximaPosicao;
             document.getElementById('manual-lado').value = ladoAtual;
             document.getElementById('manual-codigo').value = '';
+            document.getElementById('manual-tipo-teste-individual').value = configuracao.tipoTeste; // Sugerir o tipo do canteiro
             document.getElementById('manual-tipo-remessa').value = '';
             document.getElementById('preview-area').style.display = 'none';
             
@@ -896,12 +1040,18 @@
 
         function adicionarAmostraManual() {
             const codigosInput = document.getElementById('manual-codigo').value.trim();
+            const tipoTesteIndividual = document.getElementById('manual-tipo-teste-individual').value;
             const tipoRemessa = document.getElementById('manual-tipo-remessa').value;
             const lado = document.getElementById('manual-lado').value;
             const posicaoInicial = parseInt(document.getElementById('manual-posicao').value);
 
             if (!codigosInput) {
                 alert('Por favor, insira o(s) código(s) da(s) amostra(s)!');
+                return;
+            }
+
+            if (!tipoTesteIndividual) {
+                alert('Por favor, selecione o tipo de teste!');
                 return;
             }
 
@@ -932,11 +1082,11 @@
 
             // Verificar se algum código já existe no sistema COM O MESMO TIPO DE TESTE
             const codigosExistentes = codigos.filter(codigo => 
-                amostras.some(a => a.codigo === codigo && a.tipoTeste === configuracao.tipoTeste)
+                amostras.some(a => a.codigo === codigo && a.tipoTeste === tipoTesteIndividual)
             );
             
             if (codigosExistentes.length > 0) {
-                alert(`❌ Códigos já existem no sistema para o teste ${configuracao.tipoTeste}:\n${codigosExistentes.join(', ')}\n\n💡 Observação: O mesmo código pode existir para testes diferentes (GA, EA48, EA72)`);
+                alert(`❌ Códigos já existem no sistema para o teste ${tipoTesteIndividual}:\n${codigosExistentes.join(', ')}\n\n💡 Observação: O mesmo código pode existir para testes diferentes (GA, EA48, EA72)`);
                 return;
             }
 
@@ -946,7 +1096,7 @@
                 const posicao = posicaoInicial + i;
                 const conflito = amostras.find(a => a.lado === lado && a.posicao === posicao);
                 if (conflito) {
-                    conflitos.push(`Posição ${posicao}: ${conflito.codigo} (${conflito.tipoTeste || configuracao.tipoTeste})`);
+                    conflitos.push(`Posição ${posicao}: ${conflito.codigo} (${conflito.tipoTeste || 'N/A'})`);
                 }
             }
 
@@ -975,23 +1125,24 @@
                     lado: lado,
                     posicao: posicao,
                     tipoRemessa: tipoRemessa,
-                    tipoTeste: configuracao.tipoTeste, // Adicionar tipo de teste à amostra
+                    tipoTeste: tipoTesteIndividual, // Usar tipo de teste individual
                     timestamp: new Date().toISOString(),
                     manual: true
                 };
                 
                 amostras.push(amostra);
-                amostrasAdicionadas.push(`${codigo} (${configuracao.tipoTeste}) → Pos. ${posicao}`);
+                amostrasAdicionadas.push(`${codigo} (${tipoTesteIndividual}) → Pos. ${posicao}`);
             }
 
             salvarDados();
             
             // Mostrar resumo
-            const resumo = `✅ ${codigos.length} amostra(s) adicionada(s)!\n\nTeste: ${configuracao.tipoTeste}\nOrigem: ${tipoRemessa}\nLado: ${lado}\n\nDetalhes:\n${amostrasAdicionadas.join('\n')}`;
+            const resumo = `✅ ${codigos.length} amostra(s) adicionada(s)!\n\nTeste: ${tipoTesteIndividual}\nOrigem: ${tipoRemessa}\nLado: ${lado}\n\nDetalhes:\n${amostrasAdicionadas.join('\n')}`;
             alert(resumo);
             
             // Limpar formulário e sugerir próxima posição
             document.getElementById('manual-codigo').value = '';
+            document.getElementById('manual-tipo-teste-individual').value = '';
             document.getElementById('manual-tipo-remessa').value = '';
             document.getElementById('preview-area').style.display = 'none';
             
@@ -1001,6 +1152,7 @@
 
         function previewAmostras() {
             const codigosInput = document.getElementById('manual-codigo').value.trim();
+            const tipoTesteIndividual = document.getElementById('manual-tipo-teste-individual').value;
             const tipoRemessa = document.getElementById('manual-tipo-remessa').value;
             const lado = document.getElementById('manual-lado').value;
             const posicaoInicial = parseInt(document.getElementById('manual-posicao').value);
@@ -1024,32 +1176,33 @@
             }
 
             // Gerar preview
-            let previewHtml = `<strong>📊 Será(ão) criada(s) ${codigos.length} amostra(s) para ${configuracao.tipoTeste}:</strong><br><br>`;
+            const tipoTestePrev = tipoTesteIndividual || 'Não selecionado';
+            let previewHtml = `<strong>📊 Será(ão) criada(s) ${codigos.length} amostra(s) para ${tipoTestePrev}:</strong><br><br>`;
             
             for (let i = 0; i < codigos.length; i++) {
                 const codigo = codigos[i];
                 const posicao = posicaoInicial + i;
-                const existeNoTeste = amostras.some(a => a.codigo === codigo && a.tipoTeste === configuracao.tipoTeste);
-                const existeOutroTeste = amostras.some(a => a.codigo === codigo && a.tipoTeste !== configuracao.tipoTeste);
+                const existeNoTeste = tipoTesteIndividual ? amostras.some(a => a.codigo === codigo && a.tipoTeste === tipoTesteIndividual) : false;
+                const existeOutroTeste = tipoTesteIndividual ? amostras.some(a => a.codigo === codigo && a.tipoTeste !== tipoTesteIndividual) : false;
                 const conflito = amostras.find(a => a.lado === lado && a.posicao === posicao);
                 
                 let status = '✅';
                 let observacao = '';
                 
-                if (existeNoTeste) {
+                if (existeNoTeste && tipoTesteIndividual) {
                     status = '❌';
-                    observacao = ` (JÁ EXISTE PARA ${configuracao.tipoTeste})`;
-                } else if (existeOutroTeste) {
-                    const outroTeste = amostras.find(a => a.codigo === codigo && a.tipoTeste !== configuracao.tipoTeste);
+                    observacao = ` (JÁ EXISTE PARA ${tipoTesteIndividual})`;
+                } else if (existeOutroTeste && tipoTesteIndividual) {
+                    const outroTeste = amostras.find(a => a.codigo === codigo && a.tipoTeste !== tipoTesteIndividual);
                     observacao = ` (já existe para ${outroTeste.tipoTeste})`;
                 }
                 
                 if (conflito) {
                     if (status === '✅') status = '⚠️';
-                    observacao += ` | substituirá ${conflito.codigo} (${conflito.tipoTeste || configuracao.tipoTeste})`;
+                    observacao += ` | substituirá ${conflito.codigo} (${conflito.tipoTeste || 'N/A'})`;
                 }
                 
-                previewHtml += `${status} <strong>${codigo}</strong> (${configuracao.tipoTeste}) → Posição ${posicao} (${lado})${observacao}<br>`;
+                previewHtml += `${status} <strong>${codigo}</strong> (${tipoTestePrev}) → Posição ${posicao} (${lado})${observacao}<br>`;
             }
             
             if (tipoRemessa) {
@@ -1095,7 +1248,7 @@
                 if (amostraEsquerda) {
                     esquerdaCell.innerHTML = `
                         <strong>${amostraEsquerda.codigo}</strong>
-                        <div class="sample-info">${configuracao.tipoTeste}${amostraEsquerda.tipoRemessa ? ' | ' + amostraEsquerda.tipoRemessa : ''} | ${new Date(amostraEsquerda.timestamp).toLocaleDateString('pt-BR')}${amostraEsquerda.manual ? ' (Manual)' : ''}</div>
+                        <div class="sample-info">${amostraEsquerda.tipoTeste || 'N/A'}${amostraEsquerda.tipoRemessa ? ' | ' + amostraEsquerda.tipoRemessa : ''} | ${new Date(amostraEsquerda.timestamp).toLocaleDateString('pt-BR')}${amostraEsquerda.manual ? ' (Manual)' : ''}</div>
                     `;
                     esquerdaCell.style.cursor = 'pointer';
                     // Usar closure para capturar a amostra correta
@@ -1130,7 +1283,7 @@
                 if (amostraDireita) {
                     direitaCell.innerHTML = `
                         <strong>${amostraDireita.codigo}</strong>
-                        <div class="sample-info">${configuracao.tipoTeste}${amostraDireita.tipoRemessa ? ' | ' + amostraDireita.tipoRemessa : ''} | ${new Date(amostraDireita.timestamp).toLocaleDateString('pt-BR')}${amostraDireita.manual ? ' (Manual)' : ''}</div>
+                        <div class="sample-info">${amostraDireita.tipoTeste || 'N/A'}${amostraDireita.tipoRemessa ? ' | ' + amostraDireita.tipoRemessa : ''} | ${new Date(amostraDireita.timestamp).toLocaleDateString('pt-BR')}${amostraDireita.manual ? ' (Manual)' : ''}</div>
                     `;
                     direitaCell.style.cursor = 'pointer';
                     // Usar closure para capturar a amostra correta
@@ -1314,9 +1467,23 @@ Origem: ${amostra.tipoRemessa || 'Não definido'}
             if (codigo && codigo.trim()) {
                 const codigoLimpo = codigo.trim();
                 
+                // Pedir tipo de teste
+                const tipoTeste = prompt(`Tipo de teste para amostra ${codigoLimpo}:\n\n1 - GA\n2 - EA48\n3 - EA72\n\nDigite o número da opção:`);
+                
+                let tipoTesteTexto = '';
+                switch(tipoTeste) {
+                    case '1': tipoTesteTexto = 'GA'; break;
+                    case '2': tipoTesteTexto = 'EA48'; break;
+                    case '3': tipoTesteTexto = 'EA72'; break;
+                    default:
+                        alert('Tipo de teste não selecionado. Usando o padrão do canteiro.');
+                        tipoTesteTexto = configuracao.tipoTeste;
+                        break;
+                }
+                
                 // Verificar se código já existe PARA O MESMO TIPO DE TESTE
-                if (amostras.some(a => a.codigo === codigoLimpo && a.tipoTeste === configuracao.tipoTeste)) {
-                    alert(`Amostra ${codigoLimpo} já foi adicionada para o teste ${configuracao.tipoTeste}!`);
+                if (amostras.some(a => a.codigo === codigoLimpo && a.tipoTeste === tipoTesteTexto)) {
+                    alert(`Amostra ${codigoLimpo} já foi adicionada para o teste ${tipoTesteTexto}!`);
                     return;
                 }
                 
@@ -1343,7 +1510,7 @@ Origem: ${amostra.tipoRemessa || 'Não definido'}
                     lado: lado,
                     posicao: posicao,
                     tipoRemessa: tipoRemessaTexto,
-                    tipoTeste: configuracao.tipoTeste, // Adicionar tipo de teste
+                    tipoTeste: tipoTesteTexto, // Usar tipo de teste individual
                     timestamp: new Date().toISOString(),
                     manual: true
                 };
@@ -1351,7 +1518,7 @@ Origem: ${amostra.tipoRemessa || 'Não definido'}
                 amostras.push(amostra);
                 salvarDados();
                 gerarMapa();
-                alert(`✅ Amostra adicionada!\n\nCódigo: ${codigoLimpo}\nTeste: ${configuracao.tipoTeste}\nOrigem: ${tipoRemessaTexto}\nPosição: ${posicao} (${lado})`);
+                alert(`✅ Amostra adicionada!\n\nCódigo: ${codigoLimpo}\nTeste: ${tipoTesteTexto}\nOrigem: ${tipoRemessaTexto}\nPosição: ${posicao} (${lado})`);
             }
         }
 
@@ -1506,17 +1673,33 @@ Origem: ${amostra.tipoRemessa || 'Não definido'}
 
                 // Dados da tabela
                 pdf.setFont('helvetica', 'normal');
-                pdf.setFontSize(10);
+                pdf.setFontSize(9);
 
                 const amostrasEsquerda = amostras.filter(a => a.lado === 'esquerdo').sort((a, b) => a.posicao - b.posicao);
                 const amostrasDireita = amostras.filter(a => a.lado === 'direito').sort((a, b) => a.posicao - b.posicao);
-                const maxPosicoes = Math.max(amostrasEsquerda.length, amostrasDireita.length, 44);
+                const maxPosicoes = Math.max(amostrasEsquerda.length, amostrasDireita.length, 45);
 
                 for (let i = 0; i < maxPosicoes; i++) {
                     // Verificar se precisa de nova página
-                    if (yPosition > 260) {
+                    if (yPosition > 250) {
                         pdf.addPage();
                         yPosition = margem;
+                        
+                        // Repetir cabeçalho na nova página
+                        pdf.setFillColor(240, 240, 240);
+                        pdf.rect(margem, yPosition, colunaLargura, linhaAltura, 'F');
+                        pdf.rect(margem + colunaLargura, yPosition, colunaLargura, linhaAltura, 'F');
+                        pdf.rect(margem + (colunaLargura * 2), yPosition, colunaLargura, linhaAltura, 'F');
+
+                        pdf.setFont('helvetica', 'bold');
+                        pdf.setFontSize(10);
+                        pdf.text('Posição', margem + 5, yPosition + 7);
+                        pdf.text('Lado Esquerdo', margem + colunaLargura + 5, yPosition + 7);
+                        pdf.text('Lado Direito', margem + (colunaLargura * 2) + 5, yPosition + 7);
+                        yPosition += linhaAltura;
+                        
+                        pdf.setFont('helvetica', 'normal');
+                        pdf.setFontSize(9);
                     }
 
                     const posicao = i + 1;
@@ -1524,30 +1707,62 @@ Origem: ${amostra.tipoRemessa || 'Não definido'}
                     const amostraDir = amostrasDireita.find(a => a.posicao === posicao);
 
                     // Bordas das células
-                    pdf.rect(margem, yPosition, colunaLargura, linhaAltura);
-                    pdf.rect(margem + colunaLargura, yPosition, colunaLargura, linhaAltura);
-                    pdf.rect(margem + (colunaLargura * 2), yPosition, colunaLargura, linhaAltura);
+                    pdf.rect(margem, yPosition, colunaLargura, linhaAltura * 2); // Altura dupla para mais informações
+                    pdf.rect(margem + colunaLargura, yPosition, colunaLargura, linhaAltura * 2);
+                    pdf.rect(margem + (colunaLargura * 2), yPosition, colunaLargura, linhaAltura * 2);
 
-                    // Conteúdo das células
-                    pdf.text(posicao.toString(), margem + 5, yPosition + 7);
+                    // Posição
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text(posicao.toString(), margem + 5, yPosition + 6);
+                    pdf.setFont('helvetica', 'normal');
                     
+                    // Lado Esquerdo
                     if (amostraEsq) {
-                        pdf.text(amostraEsq.codigo, margem + colunaLargura + 5, yPosition + 7);
+                        const dataFormatada = new Date(amostraEsq.timestamp).toLocaleDateString('pt-BR');
+                        const tipoTeste = amostraEsq.tipoTeste || configuracao.tipoTeste;
+                        const origem = amostraEsq.tipoRemessa || 'N/A';
+                        const manual = amostraEsq.manual ? ' (Manual)' : '';
+                        
+                        // Código em negrito
+                        pdf.setFont('helvetica', 'bold');
+                        pdf.text(amostraEsq.codigo, margem + colunaLargura + 5, yPosition + 6);
+                        
+                        // Informações detalhadas
+                        pdf.setFont('helvetica', 'normal');
+                        pdf.setFontSize(7);
+                        const infoTexto = `${tipoTeste} | ${origem} | ${dataFormatada}${manual}`;
+                        pdf.text(infoTexto, margem + colunaLargura + 5, yPosition + 12);
+                        pdf.setFontSize(9);
                     } else {
                         pdf.setTextColor(128, 128, 128);
-                        pdf.text('Vazio', margem + colunaLargura + 5, yPosition + 7);
+                        pdf.text('Vazio', margem + colunaLargura + 5, yPosition + 10);
                         pdf.setTextColor(0, 0, 0);
                     }
 
+                    // Lado Direito
                     if (amostraDir) {
-                        pdf.text(amostraDir.codigo, margem + (colunaLargura * 2) + 5, yPosition + 7);
+                        const dataFormatada = new Date(amostraDir.timestamp).toLocaleDateString('pt-BR');
+                        const tipoTeste = amostraDir.tipoTeste || configuracao.tipoTeste;
+                        const origem = amostraDir.tipoRemessa || 'N/A';
+                        const manual = amostraDir.manual ? ' (Manual)' : '';
+                        
+                        // Código em negrito
+                        pdf.setFont('helvetica', 'bold');
+                        pdf.text(amostraDir.codigo, margem + (colunaLargura * 2) + 5, yPosition + 6);
+                        
+                        // Informações detalhadas
+                        pdf.setFont('helvetica', 'normal');
+                        pdf.setFontSize(7);
+                        const infoTexto = `${tipoTeste} | ${origem} | ${dataFormatada}${manual}`;
+                        pdf.text(infoTexto, margem + (colunaLargura * 2) + 5, yPosition + 12);
+                        pdf.setFontSize(9);
                     } else {
                         pdf.setTextColor(128, 128, 128);
-                        pdf.text('Vazio', margem + (colunaLargura * 2) + 5, yPosition + 7);
+                        pdf.text('Vazio', margem + (colunaLargura * 2) + 5, yPosition + 10);
                         pdf.setTextColor(0, 0, 0);
                     }
 
-                    yPosition += linhaAltura;
+                    yPosition += linhaAltura * 2; // Altura dupla
                 }
 
                 // Salvar PDF
